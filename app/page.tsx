@@ -22,7 +22,7 @@ export default function HomePage() {
       <CustomCursor />
       <LoadingScreen />
       <Navigation />
-      <main className="relative z-10">
+      <main>
         <Hero />
         <About />
         <Skills />

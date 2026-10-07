@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { navItems, resume } from "@/data/resume";
 import { gsap, prefersReducedMotion } from "@/lib/gsap";
 import { LuDownload, LuLinkedin } from "react-icons/lu";
 
 export function Navigation() {
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState("home");
   const [commandOpen, setCommandOpen] = useState(false);
@@ -15,6 +17,10 @@ export function Navigation() {
   const listRef = useRef<HTMLUListElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const sections = navItems
@@ -51,6 +57,14 @@ export function Navigation() {
   }, []);
 
   useEffect(() => {
+    const onResize = () => {
+      if (window.matchMedia("(min-width: 1280px)").matches) setOpen(false);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
     const panel = panelRef.current;
     const layers = layersRef.current;
     const list = listRef.current;
@@ -61,8 +75,8 @@ export function Navigation() {
     const reduced = prefersReducedMotion();
 
     if (!open && !wasOpen.current) {
-      gsap.set(panel, { xPercent: 100, autoAlpha: 0 });
-      gsap.set(layerNodes, { xPercent: 100 });
+      gsap.set(panel, { xPercent: 100, autoAlpha: 0, visibility: "hidden" });
+      gsap.set(layerNodes, { xPercent: 100, visibility: "hidden" });
       return;
     }
 
@@ -70,8 +84,15 @@ export function Navigation() {
     document.body.style.overflow = open ? "hidden" : "";
 
     if (reduced) {
-      gsap.set(panel, { xPercent: open ? 0 : 100, autoAlpha: open ? 1 : 0 });
-      gsap.set(layerNodes, { xPercent: open ? 0 : 100 });
+      gsap.set(panel, {
+        xPercent: open ? 0 : 100,
+        autoAlpha: open ? 1 : 0,
+        visibility: open ? "visible" : "hidden",
+      });
+      gsap.set(layerNodes, {
+        xPercent: open ? 0 : 100,
+        visibility: open ? "visible" : "hidden",
+      });
       gsap.set(labels, { yPercent: 0 });
       if (open) closeRef.current?.focus();
       return () => {
@@ -81,6 +102,7 @@ export function Navigation() {
 
     const timeline = gsap.timeline({ defaults: { ease: "power4.inOut" } });
     if (open) {
+      timeline.set([panel, ...layerNodes], { visibility: "visible" });
       timeline.set(panel, { autoAlpha: 1 });
       timeline.fromTo(layerNodes, { xPercent: 100 }, { xPercent: 0, stagger: 0.06, duration: 0.55 });
       timeline.fromTo(panel, { xPercent: 100 }, { xPercent: 0, duration: 0.6 }, "-=0.4");
@@ -90,7 +112,8 @@ export function Navigation() {
       timeline.to(labels, { yPercent: 120, stagger: 0.02, duration: 0.25 });
       timeline.to(panel, { xPercent: 100, duration: 0.4 }, "-=0.1");
       timeline.to(layerNodes, { xPercent: 100, stagger: 0.04, duration: 0.35 }, "-=0.3");
-      timeline.set(panel, { autoAlpha: 0 });
+      timeline.set(panel, { autoAlpha: 0, visibility: "hidden" });
+      timeline.set(layerNodes, { visibility: "hidden" });
     }
 
     return () => {
@@ -102,89 +125,93 @@ export function Navigation() {
 
   const close = () => setOpen(false);
   const filtered = navItems.filter((item) => item.label.toLowerCase().includes(query.toLowerCase()));
+  const initials = `${resume.personal.firstName[0]}${resume.personal.lastName[0]}`;
 
-  return (
+  const chrome = (
     <>
-      <header className="pointer-events-none fixed inset-x-0 top-0 z-[100] hidden px-4 pt-4 xl:block">
-        <nav
-          aria-label="Primary"
-          className="pointer-events-auto mx-auto grid max-w-6xl grid-cols-[auto_1fr_auto] items-center gap-4 rounded-xl border border-white/10 bg-[#171b19]/90 px-3 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-2xl"
-        >
-          <a href="#home" className="flex items-center gap-2 pr-1" aria-label={`${resume.personal.fullName}, home`} data-cursor="link">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-[#e7a83e] text-xs font-bold text-[#17130c]">AK</span>
-            <span className="hidden font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-white/80 xl:block">Abhiram</span>
-          </a>
-          <div className="flex min-w-0 flex-nowrap items-center justify-center gap-0.5">
-            {navItems.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                className="nav-link"
-                data-active={active === item.id}
-                data-cursor="link"
-              >
-                {item.label}
-              </a>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
+      <header className="site-header">
+        <div className="border-b border-white/10 bg-[#171b19] px-3 py-2.5 pt-[max(0.6rem,env(safe-area-inset-top))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] xl:border-b-0 xl:bg-transparent xl:px-4 xl:pt-4">
+          <nav
+            aria-label="Primary"
+            className="mx-auto flex max-w-6xl items-center justify-between gap-2 xl:grid xl:grid-cols-[auto_1fr_auto] xl:gap-4 xl:rounded-xl xl:border xl:border-white/10 xl:bg-[#171b19]/95 xl:px-3 xl:py-2 xl:shadow-[0_12px_40px_rgba(0,0,0,0.35)] xl:backdrop-blur-2xl"
+          >
             <a
-              className="grid h-9 w-9 place-items-center rounded-lg border border-white/15 text-white transition-colors hover:border-accent hover:text-accent"
-              href={resume.personal.linkedin}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="LinkedIn"
+              href="#home"
+              className="flex shrink-0 items-center gap-2 pr-1"
+              aria-label={`${resume.personal.fullName}, home`}
               data-cursor="link"
             >
-              <LuLinkedin aria-hidden="true" className="h-4 w-4" />
+              <span className="grid h-11 w-11 place-items-center rounded-lg bg-[#e7a83e] text-xs font-bold text-[#17130c] xl:h-9 xl:w-9">
+                {initials}
+              </span>
+              <span className="hidden font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-white/80 xl:inline">
+                {resume.personal.firstName}
+              </span>
             </a>
-            <a className="btn btn-primary btn-sm" href="/resume.pdf" download="Abhiram-Kalathur-Resume.pdf" data-cursor="button">
-              <LuDownload aria-hidden="true" />
-              Resume
-            </a>
-          </div>
-        </nav>
+
+            <div className="hidden min-w-0 flex-nowrap items-center justify-center gap-0.5 xl:flex">
+              {navItems.map((item) => (
+                <a
+                  key={item.id}
+                  href={`#${item.id}`}
+                  className="nav-link"
+                  data-active={active === item.id}
+                  data-cursor="link"
+                >
+                  {item.label}
+                </a>
+              ))}
+            </div>
+
+            <div className="flex min-w-0 items-center gap-1.5 xl:gap-2">
+              <a
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-white/15 text-white transition-colors hover:border-accent hover:text-accent xl:h-9 xl:w-9"
+                href={resume.personal.linkedin}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="LinkedIn"
+                data-cursor="link"
+              >
+                <LuLinkedin aria-hidden="true" className="h-4 w-4" />
+              </a>
+              <a
+                className="btn btn-primary btn-sm h-11 w-11 shrink-0 px-0 xl:h-auto xl:w-auto xl:px-3"
+                href="/resume.pdf"
+                download="Abhiram-Kalathur-Resume.pdf"
+                aria-label="Download resume"
+                data-cursor="button"
+              >
+                <LuDownload aria-hidden="true" />
+                <span className="hidden sm:inline">Resume</span>
+              </a>
+              <button
+                ref={closeRef}
+                type="button"
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-accent/35 bg-accent/10 px-3 text-xs font-bold uppercase tracking-wide text-white xl:hidden"
+                aria-expanded={open}
+                aria-controls="mobile-menu"
+                onClick={() => setOpen((value) => !value)}
+                data-cursor="button"
+              >
+                <span className="flex w-4 flex-col gap-1" aria-hidden="true">
+                  <span className={`block h-0.5 w-4 bg-white transition-transform ${open ? "translate-y-1.5 rotate-45" : ""}`} />
+                  <span className={`block h-0.5 w-4 bg-white transition-opacity ${open ? "opacity-0" : ""}`} />
+                  <span className={`block h-0.5 w-4 bg-white transition-transform ${open ? "-translate-y-1.5 -rotate-45" : ""}`} />
+                </span>
+                {open ? "Close" : "Menu"}
+              </button>
+            </div>
+          </nav>
+        </div>
       </header>
 
-      <div className="fixed inset-x-0 top-0 z-[100] flex w-full max-w-[100vw] items-center justify-between gap-2 border-b border-white/10 bg-[#171b19]/95 px-3 py-2.5 pt-[max(0.6rem,env(safe-area-inset-top))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] backdrop-blur-xl xl:hidden">
-        <a href="#home" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-[#e7a83e] text-xs font-bold text-[#17130c]" aria-label={`${resume.personal.fullName}, home`} data-cursor="link">
-          <span>AK</span>
-        </a>
-        <div className="flex min-w-0 items-center gap-1.5">
-          <a
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-white/15 text-white"
-            href={resume.personal.linkedin}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="LinkedIn"
-            data-cursor="link"
-          >
-            <LuLinkedin aria-hidden="true" className="h-4 w-4" />
-          </a>
-          <a className="btn btn-primary btn-sm h-11 w-11 shrink-0 px-0 sm:w-auto sm:px-3" href="/resume.pdf" download="Abhiram-Kalathur-Resume.pdf" aria-label="Download resume" data-cursor="button">
-            <LuDownload aria-hidden="true" />
-            <span className="hidden sm:inline">Resume</span>
-          </a>
-          <button
-            ref={closeRef}
-            type="button"
-            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-accent/35 bg-accent/10 px-3 text-xs font-bold uppercase tracking-wide text-white"
-            aria-expanded={open}
-            aria-controls="mobile-menu"
-            onClick={() => setOpen((value) => !value)}
-            data-cursor="button"
-          >
-            <span className="flex w-4 flex-col gap-1" aria-hidden="true">
-              <span className={`block h-0.5 w-4 bg-white transition-transform ${open ? "translate-y-1.5 rotate-45" : ""}`} />
-              <span className={`block h-0.5 w-4 bg-white transition-opacity ${open ? "opacity-0" : ""}`} />
-              <span className={`block h-0.5 w-4 bg-white transition-transform ${open ? "-translate-y-1.5 -rotate-45" : ""}`} />
-            </span>
-            {open ? "Close" : "Menu"}
-          </button>
-        </div>
-      </div>
-
-      <div className={`fixed inset-0 z-40 overflow-hidden xl:hidden ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
+      <div className={`fixed inset-0 z-[9998] overflow-hidden xl:hidden ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
+        <button
+          type="button"
+          className={`absolute inset-0 bg-black/50 transition-opacity ${open ? "opacity-100" : "opacity-0"}`}
+          aria-label="Close menu"
+          onClick={close}
+        />
         <div ref={layersRef} className="pointer-events-none invisible absolute inset-y-0 right-0 w-full sm:w-[420px]">
           <div className="absolute inset-0 bg-[#171b19]" />
           <div className="absolute inset-0 bg-accent" />
@@ -222,7 +249,7 @@ export function Navigation() {
       </div>
 
       {commandOpen ? (
-        <div className="fixed inset-0 z-[110] grid place-items-start bg-black/60 px-4 pt-[18vh]" role="presentation" onClick={() => setCommandOpen(false)}>
+        <div className="fixed inset-0 z-[10000] grid place-items-start bg-black/60 px-4 pt-[18vh]" role="presentation" onClick={() => setCommandOpen(false)}>
           <div
             role="dialog"
             aria-modal="true"
@@ -256,4 +283,7 @@ export function Navigation() {
       ) : null}
     </>
   );
+
+  if (!mounted) return null;
+  return createPortal(chrome, document.body);
 }
